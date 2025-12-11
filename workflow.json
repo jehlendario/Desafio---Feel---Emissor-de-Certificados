@@ -1,0 +1,347 @@
+{
+  "name": "Desafio - Feel - Emissor de Certificados",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "binaryPropertyName": "planilha",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        208,
+        0
+      ],
+      "id": "c4a6b1d5-4bfd-46e1-bf58-7cde0dd87638",
+      "name": "XLSX > JSON"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c6b7bdb2-a0a9-46c4-8fec-ac49161183db",
+              "leftValue": "={{ $json.Certificado }}",
+              "rightValue": "Sim",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        384,
+        0
+      ],
+      "id": "241ff6ec-346e-42da-b38a-6666434891b7",
+      "name": "Filtra Certificados - Sim"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Percorre cada aluno que passou no filtro\nreturn items.map(item => {\n  const dados = item.json;\n\n  // --- 1. FORMATAÇÃO DO NOME ---\n  // Transforma em Maiúsculo e remove a palavra \"copy\" (case insensitive) e espaços extras\n  let nomeFormatado = dados.Nome || \"\"; // Garante que não quebre se vier vazio\n  nomeFormatado = nomeFormatado.toString().toUpperCase();\n  nomeFormatado = nomeFormatado.replace(/COPY/g, \"\").replace(/\"/g, \"\").trim();\n\n  // --- 2. FORMATAÇÃO DO CPF ---\n  // Remove tudo que não é número\n  let cpfLimpo = (dados.CPF || \"\").toString().replace(/\\D/g, \"\");\n\n  // Adiciona zeros à esquerda se tiver menos de 11 dígitos (Padding)\n  cpfLimpo = cpfLimpo.padStart(11, \"0\");\n\n  // Aplica a máscara XXX.XXX.XXX-XX\n  let cpfFormatado = cpfLimpo.replace(/(\\d{3})(\\d{3})(\\d{3})(\\d{2})/, \"$1.$2.$3-$4\");\n\n  // Retorna os dados novos mantendo os antigos\n  return {\n    json: {\n      ...dados, // Mantém email, telefone, etc.\n      nome_formatado: nomeFormatado,\n      cpf_formatado: cpfFormatado\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        592,
+        0
+      ],
+      "id": "17ea11c7-134e-46f4-a707-1216e1e94f03",
+      "name": "Limpeza e Formatação - JavaScript"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "c55d63a2-9b45-4edc-81ec-d50d829afe64",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "f32c4c87-71dc-4b44-8ce7-0b56e844658b",
+      "name": "Webhook",
+      "webhookId": "c55d63a2-9b45-4edc-81ec-d50d829afe64"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Tenta pegar a imagem. Se não tiver, fica vazio.\nlet imagemFundo = \"\";\ntry {\n  const binaryData = $('Webhook').first().binary.background;\n  if (binaryData) {\n    imagemFundo = `data:${binaryData.mimeType};base64,${binaryData.data}`;\n  }\n} catch (e) {}\n\nreturn items.map(item => {\n  const nome = item.json.nome_formatado;\n  const cpf = item.json.cpf_formatado;\n\n  const html = `\n    <!DOCTYPE html>\n    <html>\n    <head>\n    <meta charset=\"UTF-8\">\n    <style>\n        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700&display=swap');\n        @import url('https://fonts.googleapis.com/css2?family=Arial&display=swap');\n        \n        body, html {\n            margin: 0;\n            padding: 0;\n            width: 100%;\n            height: 100%;\n        }\n\n        .container {\n            position: relative;\n            width: 1123px;\n            height: 794px;\n            overflow: hidden;\n        }\n\n        .img-fundo {\n            position: absolute;\n            top: 0;\n            left: 0;\n            width: 1123px;\n            height: 794px;\n            z-index: -1;\n        }\n\n        /* AJUSTE DO NOME */\n        .texto-nome {\n            position: absolute;\n            /* Subi para 310px para centralizar melhor no espaço branco vertical */\n            top: 247px; \n            /* Começa depois da barra azul (aprox 400px) */\n            left: 400px;\n            /* Largura restante da área branca */\n            width: 680px; \n            text-align: center;\n            font-family: 'Montserrat', sans-serif;\n            font-size: 42px;\n            font-weight: bold;\n            text-transform: uppercase;\n            color: #000000;\n            z-index: 10;\n            /* line-height ajuda a alinhar verticalmente se o nome for longo */\n            line-height: 1.2; \n        }\n\n        /* AJUSTE DO CPF */\n        .texto-cpf {\n            position: absolute;\n            /* Altura estimada da primeira linha do parágrafo */\n            top: 310px; \n            /* Empurrado para a direita para pular \"inscrito no CPF \" */\n            left: 665px; \n            width: 300px;\n            text-align: left; /* Importante: alinhado à esquerda para seguir a frase */\n            font-family: 'Arial', sans-serif;\n            font-size: 18px; /* Tamanho mais próximo do texto do corpo */\n            color: #555555; /* Um cinza escuro para casar com o texto */\n            z-index: 10;\n            font-weight: bold; \n            letter-spacing: 1px; /* Um leve espaçamento para facilitar leitura */\n        }\n    </style>\n    </head>\n    <body>\n        <div class=\"container\">\n            <img src=\"${imagemFundo}\" class=\"img-fundo\" />\n            \n            <div class=\"texto-nome\">${nome}</div>\n            <div class=\"texto-cpf\">${cpf}</div>\n        </div>\n    </body>\n    </html>\n  `;\n\n  return {\n    json: {\n      ...item.json,\n      meu_html: html,\n      nome_arquivo: `Certificado_${nome}.pdf`\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        0
+      ],
+      "id": "d99ca33c-f444-4563-8a21-5e55b1e4a54d",
+      "name": "Preparar HTML  - JavaScript"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json['E-mail'] }}",
+        "subject": "=Seu Certificado Chegou, {{ $json.nome_formatado }}! 🎓",
+        "message": "=<p>Olá, <strong>{{ $json.nome_formatado }}</strong>!</p>\n<p>Parabéns pela conclusão do curso. Seu certificado oficial segue em anexo.</p>\n<p>Atenciosamente,<br>Equipe Acelera Rio</p>",
+        "options": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {}
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1216,
+        0
+      ],
+      "id": "63f4f1c4-ecad-4e7e-828f-e17979e8c841",
+      "name": "MENSAGEM - GMAIL",
+      "webhookId": "40f5e536-d0b7-4aa2-94f9-56b2013f89e8",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "QKnMyN4w7uXFPanN",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e803e107-2fbf-4e4a-9825-cfaf43cfa71a",
+              "name": "numero",
+              "value": "={{ $('Limpeza e Formatação - JavaScript').item.json.Telefone }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1392,
+        0
+      ],
+      "id": "141119cc-b903-47fb-aada-110bc79659aa",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  // 1. Pega o valor que veio do Edit Fields (variável \"numero\")\n  let numeroEntrada = (item.json[\"numero\"] || \"\").toString();\n\n  // 2. Remove tudo que não for dígito (remove o hífen \"-\")\n  // Ex: \"55519117-2641\" vira \"555191172641\"\n  let apenasNumeros = numeroEntrada.replace(/\\D/g, \"\");\n\n  // 3. Lógica do 55 (DDI)\n  // Se o número já começa com 55 e é longo (tem DDD + numero), removemos o 55\n  // para garantir que vamos adicionar de volta de forma limpa depois.\n  if (apenasNumeros.startsWith(\"55\") && apenasNumeros.length > 11) {\n    apenasNumeros = apenasNumeros.slice(2); \n    // Agora \"555191172641\" virou \"5191172641\"\n  }\n\n  // 4. Adiciona o 55 obrigatório da Evolution API\n  let numeroFinal = \"55\" + apenasNumeros;\n\n  // 5. Devolve o número pronto\n  item.json[\"numero_tratado\"] = numeroFinal;\n\n  return item;\n});"
+      },
+      "id": "56730eee-9212-4b78-aaf2-8165df3d0f2d",
+      "name": "PARSE NUMBER",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://evolution2.jefersonvps.top/message/sendText/(sua_instancia)",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "(SUA API KEY EVOLUTION)"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "=application/json",
+        "body": "={\n    \"number\": \"{{ $json.numero_tratado }}\",\n    \"options\": {\n        \"delay\": 1200,\n        \"presence\": \"composing\",\n        \"linkPreview\": true\n    },\n    \"text\": \"Olá *{{ $('Preparar HTML  - JavaScript').item.json.Nome }}*! 🎓\\n\\nParabéns! 🥳\\n\\nSeu certificado oficial do *Acelera Rio* já foi gerado e enviado para o seu e-mail: {{ $('Preparar HTML  - JavaScript').item.json['E-mail'] }}.\\n\\n📂 Por favor, verifique sua caixa de entrada (e também o SPAM) para baixar o PDF em anexo.\\n\\nAtt,\\n*Equipe Acelera Rio*\"\n}",
+        "options": {}
+      },
+      "id": "d73b0b6c-966f-4dd5-adf0-71bed07ed0b6",
+      "name": "Envia Mensagem no WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1808,
+        0
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "jLwZSUMDnnZbaask",
+          "name": "Junior - Evolution2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.pdfshift.io/v3/convert/pdf",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "sk_56142c9259e4e390ab4a2f8f87f5d142feed1004"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  {\n    \"source\": $json.meu_html,\n    \"landscape\": true,\n    \"sandbox\": true,\n    \"use_print\": false,\n    \"format\": \"A4\",\n    \"margin\": {\n      \"top\": \"0\",\n      \"right\": \"0\",\n      \"bottom\": \"0\",\n      \"left\": \"0\"\n    }\n  }\n}}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1008,
+        0
+      ],
+      "id": "fd403b41-93e7-40f2-b816-145cf452ecbe",
+      "name": "PDFshift - Convert para PDF"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "XLSX > JSON": {
+      "main": [
+        [
+          {
+            "node": "Filtra Certificados - Sim",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtra Certificados - Sim": {
+      "main": [
+        [
+          {
+            "node": "Limpeza e Formatação - JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limpeza e Formatação - JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Preparar HTML  - JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "XLSX > JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar HTML  - JavaScript": {
+      "main": [
+        [
+          {
+            "node": "PDFshift - Convert para PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MENSAGEM - GMAIL": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "PARSE NUMBER",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PARSE NUMBER": {
+      "main": [
+        [
+          {
+            "node": "Envia Mensagem no WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDFshift - Convert para PDF": {
+      "main": [
+        [
+          {
+            "node": "MENSAGEM - GMAIL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "452a6857-c8d4-4581-b982-cd797056f874",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8f522242879c66ad9e2122cdffbc52184f8bf02a00800920319e45c9aa7d9154"
+  },
+  "id": "jXzmDR8rCvWE1Gz5",
+  "tags": []
+}
