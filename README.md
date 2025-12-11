@@ -4,6 +4,9 @@
 Este projeto consiste em um fluxo de automação desenvolvido no **n8n** que recebe uma planilha Excel, trata os dados dos contatos e realiza o envio de mensagens via WhatsApp utilizando a **Evolution API**.
 
 O projeto conta também com uma interface de upload desenvolvida no **Lovable**.
+Você pode acessar ela neste link: Entregáveis:
+
+Lovable: https://certiprep-hub.lovable.app
 
 ## 🚀 Funcionalidades
 
